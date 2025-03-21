@@ -3,15 +3,80 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "uni-app"
+				
 			}
+		},
+		{
+			"path" : "pages/target/target",
+			"style" : 
+			{
+				
+			}
+		},
+		{
+			"path" : "pages/kuibu/kuibu",
+			"style" : 
+			{
+				
+			}
+		},
+		{
+			"path" : "pages/user/user",
+			"style" : 
+			{
+				
+			}
+		},
+		{
+			"path" : "pages/task/task",
+			"style" : {}
 		}
 	],
 	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "uni-app",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
+		// 去掉顶部导航栏
+		"navigationStyle": "custom"
 	},
-	"uniIdRouter": {}
+	"uniIdRouter": {},
+	"tabBar": {
+		// 默认文字颜色
+		"color": "#d8d8d8",
+		// 默认选中色
+		"selectedColor": "#cd87ff",
+		// tab 上边框颜色 black or white
+		"borderStyle": "white",
+		// 文字大小
+		"fontSize": "20rpx",
+		"height": "130rpx",
+		"iconWidth": "50rpx",
+		"spacing": "10rpx",
+		// 最少两个，最多五个
+		"list": [
+			{
+				// 页面路径 必填
+				"pagePath": "pages/index/index",
+				// 文字内容 必填
+				"text": "首页",
+				"iconPath": "/static/images/home.png",
+				"selectedIconPath": "/static/images/home-h.png"
+			},
+			{
+				"pagePath": "pages/target/target",
+				"text": "目标",
+				"iconPath": "/static/images/target.png",
+				"selectedIconPath": "/static/images/target-h.png"
+			},
+			{
+				"pagePath": "pages/kuibu/kuibu",
+				"text": "跬步",
+				"iconPath": "/static/images/kuibu.png",
+				"selectedIconPath": "/static/images/kuibu-h.png"
+			},
+			{
+				"pagePath": "pages/user/user",
+				"text": "我的",
+				"iconPath": "/static/images/user.png",
+				"selectedIconPath": "/static/images/user-h.png"
+			}
+		]
+	}
 }
