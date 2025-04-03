@@ -1,10 +1,11 @@
 <script>
-	import { login } from "@/api/common.js"
+	import { login, mockLogin } from "@/api/common.js"
 	
 	export default {
 		onLaunch: function() {
 			console.log('App Launch')
-			login()
+			// login()
+			mockLogin()
 		},
 		onShow: function() {
 			console.log('App Show')

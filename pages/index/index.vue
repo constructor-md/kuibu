@@ -3,7 +3,7 @@
 		<view class="top">
 			<view class="text">
 				<view class="title"> {{ title }} </view>
-				<view class="taskOngoing">8 个目标进行中 ... </view>
+				<view class="taskOngoing">{{ongoingTaskCount}} 个任务进行中 ... </view>
 			</view>
 		</view>
 		<view class="middle">
@@ -11,8 +11,8 @@
 				<view class="sentence"> {{ sentence }} </view>
 				<view class="author"> {{ name }}：{{ origin }} </view>
 				<view class="date">
-					<text class="day">12</text>
-					<text class="month">MAR</text>
+					<text class="day">{{dayOfMonth}}</text>
+					<text class="month">{{month}}</text>
 				</view>
 			</view>
 		</view>
@@ -22,8 +22,8 @@
 			</view>
 			<view class="center">
 				<swiper scroll-y="true" autoplay vertical circular>
-					<swiper-item v-for="item in 5">
-						文字内容文字内容文字内容文字内容文字内容文字内容文字内容文字内容文字内容
+					<swiper-item v-for="item in noticeList">
+						{{item}}
 					</swiper-item>
 				</swiper>
 			</view>
@@ -38,7 +38,7 @@
 						<image src="../../static/images/step.png" mode=""></image>
 					</view>
 					<view class="text">
-						<text class="step">30</text>
+						<text class="step">{{completedTaskCount}}</text>
 						步矣
 					</view>
 				</view>
@@ -47,7 +47,7 @@
 						<image src="../../static/images/tag.png" mode=""></image>
 					</view>
 					<view class="text">
-						<text class="step">8</text>
+						<text class="step">{{ongoingGoalCount}}</text>
 						欲行
 					</view>
 				</view>
@@ -81,30 +81,39 @@
 				任务名
 			</view>
 			<view class="content">
-				<input type="text" placeholder="请输入任务名" />
+				<input v-model="inputTaskName" type="text" placeholder="请输入任务名" />
 			</view>
 
 			<view class="titleName">
 				所属目标
 			</view>
 			<view class="content">
-				<uni-data-select v-model="selectedTarget" :localdata="targets" :clear=false
-					@change="handleTargetChange(selectedTarget)"></uni-data-select>
+				<uni-data-select 
+					class="select" 
+					v-model="selectedTarget" 
+					:localdata="targets" 
+					:clear=false
+					emptyTips="请创建目标"
+					></uni-data-select>
 			</view>
 
 			<view class="titleName">
 				任务类型
 			</view>
 			<view class="content">
-				<uni-data-select v-model="selectedTaskType" :localdata="taskTypes" :clear=false
-					@change="handleTaskChange(selectedTaskType)"></uni-data-select>
+				<uni-data-select 
+					class="select" 
+					v-model="selectedTaskType" 
+					:localdata="taskTypes" 
+					:clear="false"
+					></uni-data-select>
 			</view>
 
 			<view class="titleName">
 				任务目标
 			</view>
 			<view class="content">
-				<input type="number" placeholder="请输入目标数量" />
+				<input v-model="inputTaskCount" type="number" placeholder="请输入目标数量" />
 			</view>
 
 		</view>
@@ -118,54 +127,24 @@
 
 <script setup>
 	import {
-		computed,
-		ref
-	} from 'vue';
+		refreshUserinfo
+	} from "@/api/common.js"
+	import {
+		apiGetOngoingTaskCount,
+		apiGetCompletedTaskCount,
+		apiGetOngoingGoalCount,
+		apiGetTargetList,
+		apiAddTask,
+		apiGetDailyWords,
+		apiGetNotice
+	} from "@/api/api.js"
 
-	const popTask = ref(null);
-	const addTask = () => {
-		// 弹框中间
-		popTask.value.show = true
-	}
-	const closeTaskPopup = function() {
-		popTask.value.show = false;
-		console.log("close");
-	}
-	const submitTask = function() {
-		popTask.value.show = false;
-	}
-	const selectedTarget = ref("1");
-	const targets = ref([
-		{
-			text: "目标1",
-			value: "1"
-		},
-		{
-			text: "目标2",
-			value: "2"
-		},
-		{
-			text: "目标3",
-			value: "3"
-		},
-		{
-			text: "目标4",
-			value: "4"
-		}
-	]);
-	const selectedTaskType = ref("number");
-	const taskTypes = ref([
-		{
-			text: "数量",
-			value: "number"
-		},
-		{
-			text: "时间",
-			value: "time"
-		}
-	]);
 
-	const username = uni.getStorageSync("username") ? uni.getStorageSync("username") : "无名";
+	const username = ref(uni.getStorageSync("username"))
+	const refreshUserInfo = async () => {
+		await refreshUserinfo()
+		username.value = uni.getStorageSync("username")
+	}
 	const title = computed(() => {
 		let now = new Date(); // 获取当前时间
 		let hour = now.getHours(); // 获取当前小时数（0-23）
@@ -179,33 +158,167 @@
 		} else if (hour >= 18 && hour < 22) {
 			gretting = "晚上好，"
 		}
-		return gretting + username;
+		return gretting + username.value;
 	})
 
+	const now = ref(new Date());
+	const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", 
+	                          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+	const month = monthNames[now.value.getMonth()]
+	const dayOfMonth = now.value.getDate()
+
+	const startTask = () => {
+		uni.navigateTo({
+			url: "/pages/task/task"
+		})
+	}
+
+
+	const ongoingTaskCount = ref(0);
+	const completedTaskCount = ref(0);
+	const ongoingGoalCount = ref(0);
+	const refreshAnalysisCount = async () => {
+		let result;
+		result = await apiGetOngoingTaskCount()
+		ongoingTaskCount.value = result.data
+		result = await apiGetCompletedTaskCount()
+		completedTaskCount.value = result.data
+		result = await apiGetOngoingGoalCount()
+		ongoingGoalCount.value = result.data
+	}
+	onShow(() => {
+		refreshUserInfo()
+		refreshAnalysisCount()
+		refreshDailySentence()
+		getSentences()
+	})
+	
+	
 	const name = ref("")
 	const origin = ref("")
 	const sentence = ref("")
-	uni.request({
-		url: "https://api.xygeng.cn/one",
-	}).then(res => {
-		if (res.data.code === 200) {
-			name.value = res.data.data.name
-			origin.value = res.data.data.origin
-			sentence.value = res.data.data.content
+	const refreshDailySentence = async () => {
+		let result = await apiGetDailyWords()
+		name.value = result.data.author
+		origin.value = result.data.source
+		sentence.value = result.data.sentence
+	}
+
+	const popTask = ref(null);
+	const addTask = () => {
+		// 弹框中间
+		popTask.value.show = true
+		refreshTargetList()
+	}
+	const inputTaskName  = ref("")
+	const inputTaskCount = ref(0)
+	const closeTaskPopup = function() {
+		popTask.value.show = false;
+		// 清除数据
+		inputTaskName.value = ""
+		inputTaskCount.value = 0
+	}
+	const submitTask = async function() {
+		if(inputTaskName.value.trim().length === 0) {
+			uni.showToast({
+				title:"任务名称不可没有内容",
+				icon:"error"
+			})
+			return
 		}
-	})
-	
-	const startTask = () => {
-		uni.navigateTo({
-			url:"/pages/task/task"
+		if(inputTaskCount.value <= 0) {
+			uni.showToast({
+				title:"任务目标不可小于等于0",
+				icon:"error"
+			})
+			return
+		}
+		const result = await apiAddTask({
+			name: inputTaskName.value,
+			type: selectedTaskType.value,
+			goalId: selectedTarget.value,
+			amount: inputTaskCount.value
 		})
+		
+		popTask.value.show = false;
+		// 清除数据
+		inputTaskName.value = ""
+		inputTaskCount.value = 0
+	}
+	const selectedTarget = ref(null);
+	const targets = ref([]);
+	const refreshTargetList = async () => {
+		let result = await apiGetTargetList()
+		targets.value = result.data.map(item => ({
+			text: item.name,
+			value: item.id,
+		}))
 	}
 	
+	const selectedTaskType = ref("2");
+	const taskTypes = ref([{
+			text: "数量",
+			value: "2"
+		},
+		{
+			text: "时间",
+			value: "1"
+		}
+	]);
 	
+	
+	const formatTimeAgo = (createTime) => {
+	    const now = new Date();
+	    const create = new Date(createTime);
+	    const diff = now - create;
+	    const seconds = Math.floor(diff / 1000);
+	    const minutes = Math.floor(seconds / 60);
+	    const hours = Math.floor(minutes / 60);
+	    const days = Math.floor(hours / 24);
+	
+	    if (days > 0) {
+	        return `${days}天前`;
+	    } else if (hours > 0) {
+	        return `${hours}小时前`;
+	    } else if (minutes > 0) {
+	        return `${minutes}分钟前`;
+	    } else {
+	        return `${seconds}秒前`;
+	    }
+	}
+	
+	const formatCount = (taskType, count) => {
+	    if (taskType === 2) {
+	        return `${count}次`;
+	    } else if (taskType === 1) {
+	        const totalSeconds = Math.floor(count / 1000);
+	        const hours = Math.floor(totalSeconds / 3600);
+	        const minutes = Math.floor((totalSeconds % 3600) / 60);
+	        const seconds = totalSeconds % 60;
+	
+	        if (hours > 0) {
+	            return `${hours}小时${minutes}分${seconds}秒`;
+	        } else if (minutes > 0) {
+	            return `${minutes}分${seconds}秒`;
+	        } else {
+	            return `${seconds}秒`;
+	        }
+	    }
+	}
+	
+	const noticeList = ref([])
+	const getSentences = async () => {
+		let result = await apiGetNotice()
+		
+		noticeList.value = result.data.map(item => {
+		    const timeAgo = formatTimeAgo(item.createTime);
+		    const formattedCount = formatCount(item.taskType, item.count);
+		    return `${item.taskName} ${timeAgo} 完成${formattedCount}`;
+		});
+	}
 </script>
 
 <style lang="scss" scoped>
-	
 	.popTitle {
 		height: 15%;
 		display: flex;
@@ -214,7 +327,7 @@
 		color: #cd87ff;
 		font-size: 40rpx;
 	}
-	
+
 	.popTaskContent {
 		height: 70%;
 		background: #faf7fa;
@@ -222,38 +335,38 @@
 		grid-template-columns: auto auto auto auto auto auto;
 		grid-template-rows: 25% 25% 25% 25%;
 		place-items: center;
-	
+
 		.titleName {
 			grid-column-start: 1;
 			grid-column-end: 3;
 			color: #cd87ff;
 		}
-	
+
 		.content {
 			grid-column-start: 3;
 			grid-column-end: 7;
 			height: 60rpx;
 			border-radius: 50rpx;
-			
+
 			display: flex;
 			align-items: center;
 			justify-content: center;
-	
+
 			input {
 				width: 260rpx;
 			}
-	
-			.uni-select {
+
+			.select {
 				width: 260rpx;
 			}
 		}
-	
+
 	}
 
 	.popFooter {
 		display: flex;
 		height: 15%;
-	
+
 		.btn {
 			color: #cd87ff;
 			width: 50%;
@@ -262,8 +375,8 @@
 			justify-content: center;
 		}
 	}
-	
-	
+
+
 	.layout {
 		width: 100vw;
 		height: 100vh;
@@ -366,33 +479,37 @@
 				}
 			}
 		}
-		
+
 		.notice {
 			width: 630rpx;
 			height: 6vh;
 			display: flex;
 			margin-top: 10rpx;
+
 			.left {
 				width: 80rpx;
 				display: flex;
 				align-items: center;
 				justify-content: center;
+
 				image {
 					width: 50rpx;
 					height: 50rpx;
 				}
 			}
-			.center{
-				width: 480rpx;
-				// flex:1;
+
+			.center {
+				width: 500rpx;
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				swiper{
+
+				swiper {
 					display: flex;
 					align-items: center;
 					justify-content: center;
-					swiper-item{
+
+					swiper-item {
 						// 显示不全的变成...
 						overflow: hidden;
 						white-space: nowrap;
@@ -400,11 +517,12 @@
 						font-size: 30rpx;
 						margin-top: 7rpx;
 					}
+
 					width: 500rpx;
 					height: 50rpx;
 				}
 			}
-			
+
 		}
 
 		.content {
@@ -419,7 +537,7 @@
 			.review {
 				width: 100%;
 				height: 5%;
-				
+
 				margin-left: 30rpx;
 				margin-top: 10rpx;
 				font-size: 38rpx;
@@ -443,7 +561,8 @@
 					align-items: center;
 					justify-content: center;
 					flex-direction: column;
-					.icon{
+
+					.icon {
 						width: 110rpx;
 						height: 110rpx;
 						background: #faf7fa;
@@ -451,20 +570,23 @@
 						display: flex;
 						align-items: center;
 						justify-content: center;
-						image{
+
+						image {
 							width: 66rpx;
 							height: 66rpx;
 						}
 					}
-					.text{
+
+					.text {
 						margin-top: 10rpx;
 						color: #cd87ff;
 						font-size: 25rpx;
-						.step{
+
+						.step {
 							font-size: 50rpx;
 						}
 					}
-					
+
 				}
 
 				.yesterday {
@@ -479,7 +601,8 @@
 					align-items: center;
 					justify-content: center;
 					flex-direction: column;
-					.icon{
+
+					.icon {
 						width: 110rpx;
 						height: 110rpx;
 						background: #faf7fa;
@@ -487,16 +610,19 @@
 						display: flex;
 						align-items: center;
 						justify-content: center;
-						image{
+
+						image {
 							width: 66rpx;
 							height: 66rpx;
 						}
 					}
-					.text{
+
+					.text {
 						margin-top: 10rpx;
 						color: #cd87ff;
 						font-size: 25rpx;
-						.step{
+
+						.step {
 							font-size: 50rpx;
 						}
 					}
@@ -514,7 +640,8 @@
 					align-items: center;
 					justify-content: center;
 					flex-direction: column;
-					.icon{
+
+					.icon {
 						width: 110rpx;
 						height: 110rpx;
 						background: #faf7fa;
@@ -522,12 +649,14 @@
 						display: flex;
 						align-items: center;
 						justify-content: center;
-						image{
+
+						image {
 							width: 66rpx;
 							height: 66rpx;
 						}
 					}
-					.text{
+
+					.text {
 						margin-top: 10rpx;
 						color: #cd87ff;
 						font-size: 30rpx;
@@ -546,7 +675,8 @@
 					align-items: center;
 					justify-content: center;
 					flex-direction: column;
-					.icon{
+
+					.icon {
 						width: 110rpx;
 						height: 110rpx;
 						background: #faf7fa;
@@ -554,12 +684,14 @@
 						display: flex;
 						align-items: center;
 						justify-content: center;
-						image{
+
+						image {
 							width: 66rpx;
 							height: 66rpx;
 						}
 					}
-					.text{
+
+					.text {
 						margin-top: 10rpx;
 						color: #cd87ff;
 						font-size: 30rpx;

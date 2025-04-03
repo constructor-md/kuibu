@@ -2,20 +2,20 @@
 	<view class="layout">
 		<view class="header">
 			<text class="title">行则必至</text>
-			<uni-data-select class="target-select" v-model="selectedTarget" :localdata="targets" :clear=false
-				@change="handleTargetChange(selectedTarget)"></uni-data-select>
-			<uni-data-select class="task-select" v-model="selectedTask" :localdata="tasks" :clear=false
-				@change="handleTaskChange(selectedTask)"></uni-data-select>
+			<uni-data-select class="target-select" v-model="selectedTargetId" :localdata="targets" :clear=false
+				@change="handleTargetChange(selectedTargetId)"></uni-data-select>
+			<uni-data-select class="task-select" v-model="selectedTaskId" :localdata="tasks" :clear=false
+				@change="handleTaskChange(selectedTaskId)"></uni-data-select>
 		</view>
 		<view class="content">
-			<template v-if="currentTask.type === 'number'">
+			<template v-if="currentTask.type === 2">
 				<view class="title">
 					计数类任务
 				</view>
 				<view class="plusNumber" @click="plus(8)">
 					+ 8
 				</view>
-				<view class="plusNumber"@click="plus(12)">
+				<view class="plusNumber" @click="plus(12)">
 					+ 12
 				</view>
 				<view class="plusNumber" @click="plus(20)">
@@ -24,9 +24,14 @@
 				<view class="plusNumber" @click="plus(50)">
 					+ 50
 				</view>
-				<view class="plusNumber">
+				<view class="plusNumberBar" :class="{active: isActive}">
 					<input type="number" placeholder="请输入数量" v-model="inputValue" maxlength=5 />
-					<view @click="plus(inputValue)" class="plusBtn"> + </view>
+					<view 
+						@click="plus(inputValue)" 
+						class="plusBtn"
+						@mousedown="handleMouseDown"
+						@mouseup="handleMouseUp"
+						> + </view>
 				</view>
 			</template>
 			<template v-else>
@@ -69,14 +74,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-
+	import {
+		apiGetTargetList,
+		apiGetTaskList,
+		apiAddKuibuInfo,
+	} from "@/api/api.js"
 	const init = ref(true)
 	const running = ref(false)
 	const startTime = ref(0); // 开始时间
 	const elapsedTime = ref(0); // 经过的时间（毫秒）
 	const intervalId = ref(null); // 定时器ID
-	console.log(555 / 2);
 	// 格式化时间
 	const formattedTime = computed(() => {
 		const totalSeconds = Math.floor(elapsedTime.value / 1000);
@@ -122,10 +129,14 @@ import { ref } from 'vue';
 	function reset() {
 		uni.showModal({
 			title:"是否提交？",
-			success: (res) => {
+			success: async (res) => {
 				if(res.confirm) {
-					clearInterval(intervalId.value);
 					init.value = true;
+					await apiAddKuibuInfo({
+						taskId: currentTask.value.id,
+						type: currentTask.value.type,
+						count: elapsedTime.value
+					})
 					elapsedTime.value = 0;
 					uni.showToast({
 						title:"数据已提交",
@@ -146,67 +157,87 @@ import { ref } from 'vue';
 	const openTimePicker = () => {
 		timePicker.value.show()
 	}
-	const time = ref("21:20:00")
+	const time = ref("")
 	const completeTimeSelect = (diyTime) => {
-		console.log("diyTime", diyTime);
-		console.log("time", time.value);
+		time.value = diyTime
+		let [hours, minutes, seconds] = time.value.split(":").map(Number);
+		elapsedTime.value = (hours * 3600 + minutes * 60 + seconds) * 1000;
+		init.value = false;
+		running.value = false;
 	}
 	// 下拉框选中值
-	const selectedTarget = ref("1");
-	const selectedTask = ref("1");
-	const currentTask = ref({
-		id: 1,
-		name: "任务1",
-		type: "number"
+	const selectedTargetId = ref("xxx");
+	const selectedTaskId = ref("xxx");
+	const currentTask = ref({})
+	
+	onShow(async () => {
+		// 初始化下拉框
+		await refreshTargetList();
+		await refreshTaskList()
 	})
-	console.log("currentTask.value.type", currentTask.value.type);
+	
+	const refreshTargetList = async () => {
+		let result = await apiGetTargetList()
+		targets.value = result.data.map(target => ({
+			text: target.name,
+			value: target.id
+		}))
+		selectedTargetId.value = targets.value[0].value
+	}
+	
+	const refreshTaskList = async () => {
+		let result = await apiGetTaskList(selectedTargetId.value)
+		tasks.value = result.data.map(task => ({
+			text: task.name,
+			value: task.id
+		}))
+		// 查询后选中值默认为第一项
+		selectedTaskId.value = tasks.value[0].value
+		taskData.value = result.data
+		setCurrentTask()
+	}
+	
+	const taskData = ref([])
+	const setCurrentTask = () => {
+		currentTask.value = taskData.value
+									.find(task => task.id === selectedTaskId.value)
+	}
+	
 	// 下拉框选项
-	const targets = ref([{
-			text: "目标1",
-			value: "1"
-		},
-		{
-			text: "目标2",
-			value: "2"
-		},
-		{
-			text: "目标3",
-			value: "3"
-		},
-		{
-			text: "目标4",
-			value: "4"
-		}
-	]);
-	const tasks = ref([{
-			text: "任务1",
-			value: "1"
-		},
-		{
-			text: "任务2",
-			value: "2"
-		},
-		{
-			text: "任务3",
-			value: "3"
-		},
-		{
-			text: "任务4",
-			value: "4"
-		}
-	]);
-	// 处理选中事件
-	const handleTargetChange = (value) => {
-		console.log("target选中的值：", value);
+	const targets = ref([]);
+	const tasks = ref([]);
+	// 选中目标
+	const handleTargetChange = async (value) => {
+		await refreshTaskList()
 	};
 	const handleTaskChange = (value) => {
-		console.log("task选中的值：", value);
+		setCurrentTask()
+	};
+	const inputValue = ref()
+	const plus = async (num) => {
+		if(num > 0) {
+			await apiAddKuibuInfo({
+				taskId: currentTask.value.id,
+				type: currentTask.value.type,
+				count: num
+			})
+		}
+	}
+	
+	const isActive = ref(false)
+	const isMouseDown = ref(false)
+	const handleMouseDown = () => {
+	  isActive.value = true;
+	  const mouseUpHandler = () => {
+	    isActive.value = false;
+	    document.removeEventListener('mouseup', mouseUpHandler);
+	  };
+	  document.addEventListener('mouseup', mouseUpHandler);
 	};
 	
-	const inputValue = ref(0)
-	const plus = (num) => {
-		console.log("plus", num);
-	}
+	const handleMouseUp = () => {
+	  isActive.value = false;
+	};
 </script>
 
 <style lang="scss">
@@ -223,9 +254,8 @@ import { ref } from 'vue';
 			height: 90rpx;
 			margin-top: 100rpx;
 			position: relative;
-			// background: pink;
 
-			.title {
+			.title {				
 				font-size: 34rpx;
 				position: absolute;
 				margin-top: 20rpx;
@@ -287,8 +317,28 @@ import { ref } from 'vue';
 				color: #eee;
 				font-size: 32rpx;
 				box-shadow: 2px 2px 5px rgba(128, 128, 128, 0.5);
-				
+				transition: transform 0.3s ease, background-color 0.3s ease;
+			}
+			
+			.plusNumber:active {
+			  transform: scale(0.95);
+			}
+			
+			.plusNumberBar {
+				height: 100rpx;
+				width: 600rpx;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: linear-gradient(to right, #a56aff, #dc94ff);
+				border-radius: 50rpx;
+				margin-top: 50rpx;
+				color: #eee;
+				font-size: 32rpx;
+				box-shadow: 2px 2px 5px rgba(128, 128, 128, 0.5);
+				transition: transform 0.3s ease, background-color 0.3s ease;
 				input {
+					text-align: center;
 					margin-left: 100rpx;
 					width: 300rpx;
 				}
@@ -299,6 +349,11 @@ import { ref } from 'vue';
 					align-items: center;
 					justify-content: center;
 				}
+			}
+			
+			.plusNumberBar.active {
+				// 缩放 95%
+			  transform: scale(0.95);
 			}
 
 			.time {
